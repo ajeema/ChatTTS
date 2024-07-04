@@ -4,7 +4,32 @@ import re
 import numpy as np
 import torch
 from typing import Dict, Tuple, List, Literal, Callable, Optional
-import sys
+from numba import jit
+
+
+@jit
+def _find_index(table: np.ndarray, val: np.uint16):
+    for i in range(table.size):
+        if table[i] == val:
+            return i
+    return -1
+
+
+@jit
+def _fast_replace(
+    table: np.ndarray, text: bytes
+) -> Tuple[np.ndarray, List[Tuple[str, str]]]:
+    result = np.frombuffer(text, dtype=np.uint16).copy()
+    replaced_words = []
+    for i in range(result.size):
+        ch = result[i]
+        p = _find_index(table[0], ch)
+        if p >= 0:
+            repl_char = table[1][p]
+            result[i] = repl_char
+            replaced_words.append((chr(ch), chr(repl_char)))
+    return result, replaced_words
+
 
 class Normalizer:
     def __init__(self, map_file_path: str, logger=logging.getLogger(__name__)):
