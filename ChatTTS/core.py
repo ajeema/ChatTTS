@@ -35,8 +35,7 @@ class Chat:
 
         self.pretrain_models = {}
         self.normalizer = Normalizer(
-            os.path.join(os.path.dirname(__file__), "res", "homophones_map.json"),
-            logger,
+            map_file_path=os.path.join(os.path.dirname(__file__), "res", "homophones_map.json")
         )
         with open(
             os.path.join(os.path.dirname(__file__), "res", "sha256_map.json")
