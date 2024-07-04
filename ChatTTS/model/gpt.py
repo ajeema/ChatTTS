@@ -262,6 +262,10 @@ class GPT(nn.Module):
                     hiddens.append(hidden_states[:, -1, :])
 
                 logits = self._get_logits(hidden_states, infer_text)
+                
+                if temperature.shape[0] != logits.shape[0]:
+                    temperature = temperature[0].unsqueeze(0).expand(logits.shape[0], -1).contiguous().view(-1, 1)
+                
                 logits /= temperature
 
                 for processor in logits_processors:
