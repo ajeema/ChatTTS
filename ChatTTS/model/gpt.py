@@ -148,12 +148,6 @@ class GPT(nn.Module):
             elif past_length < input_ids.shape[1]:
                 input_ids = input_ids.narrow(1, past_length, input_ids.size(1) - past_length)
 
-            if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
-                start = -(attention_mask.shape[1] - past_length)
-                input_ids = input_ids.narrow(1, start, -start)
-            elif past_length < input_ids.shape[1]:
-                input_ids = input_ids.narrow(1, past_length, input_ids.size(1) - past_length)
-
         if attention_mask is not None and position_ids is None:
             position_ids = attention_mask.long().cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask.eq(0), 1)
