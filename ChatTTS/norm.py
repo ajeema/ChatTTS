@@ -4,6 +4,7 @@ import re
 import numpy as np
 import torch
 from typing import Dict, Tuple, List, Literal, Callable, Optional
+import sys
 
 class Normalizer:
     def __init__(self, map_file_path: str, logger=logging.getLogger(__name__)):
