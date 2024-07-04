@@ -4,49 +4,49 @@ prompt_dict = {
     "kimi": [
         {
             "role": "system",
-            "content": "你是 Kimi，由 Moonshot AI 提供的人工智能助手，你更擅长中文和英文的对话。",
+            "content": "You are Kimi, an AI assistant provided by Moonshot AI. You are proficient in both Chinese and English conversations.",
         },
         {
             "role": "user",
-            "content": "你好，请注意你现在生成的文字要按照人日常生活的口吻，你的回复将会后续用TTS模型转为语音，并且请把回答控制在100字以内。并且标点符号仅包含逗号和句号，将数字等转为文字回答。",
+            "content": "Hello, please note that the text you generate should follow a natural conversational tone. Your responses will be converted to speech by a TTS model, and please keep your answers within 100 characters. Also, use only commas and periods for punctuation, and convert numbers to words.",
         },
         {
             "role": "assistant",
-            "content": "好的，我现在生成的文字将按照人日常生活的口吻， 并且我会把回答控制在一百字以内, 标点符号仅包含逗号和句号，将阿拉伯数字等转为中文文字回答。下面请开始对话。",
+            "content": "Got it, I will generate text in a natural conversational tone, keep my responses within 100 characters, use only commas and periods for punctuation, and convert numbers to words. Let's start the conversation.",
         },
     ],
     "deepseek": [
         {"role": "system", "content": "You are a helpful assistant"},
         {
             "role": "user",
-            "content": "你好，请注意你现在生成的文字要按照人日常生活的口吻，你的回复将会后续用TTS模型转为语音，并且请把回答控制在100字以内。并且标点符号仅包含逗号和句号，将数字等转为文字回答。",
+            "content": "Hello, please note that the text you generate should follow a natural conversational tone. Your responses will be converted to speech by a TTS model, and please keep your answers within 100 characters. Also, use only commas and periods for punctuation, and convert numbers to words.",
         },
         {
             "role": "assistant",
-            "content": "好的，我现在生成的文字将按照人日常生活的口吻， 并且我会把回答控制在一百字以内, 标点符号仅包含逗号和句号，将阿拉伯数字等转为中文文字回答。下面请开始对话。",
+            "content": "Got it, I will generate text in a natural conversational tone, keep my responses within 100 characters, use only commas and periods for punctuation, and convert numbers to words. Let's start the conversation.",
         },
     ],
     "deepseek_TN": [
         {"role": "system", "content": "You are a helpful assistant"},
         {
             "role": "user",
-            "content": "你好，现在我们在处理TTS的文本输入，下面将会给你输入一段文本，请你将其中的阿拉伯数字等等转为文字表达，并且输出的文本里仅包含逗号和句号这两个标点符号",
+            "content": "Hello, we are now processing text input for TTS. Please input a text, and convert any numbers to words, using only commas and periods for punctuation.",
         },
         {
             "role": "assistant",
-            "content": "好的，我现在对TTS的文本输入进行处理。这一般叫做text normalization。下面请输入",
+            "content": "Got it, I am now processing the text input for TTS. This is generally called text normalization. Please input the text.",
         },
         {"role": "user", "content": "We paid $123 for this desk."},
         {
             "role": "assistant",
             "content": "We paid one hundred and twenty three dollars for this desk.",
         },
-        {"role": "user", "content": "详询请拨打010-724654"},
-        {"role": "assistant", "content": "详询请拨打零幺零，七二四六五四"},
-        {"role": "user", "content": "罗森宣布将于7月24日退市，在华门店超6000家！"},
+        {"role": "user", "content": "For more details, please call 010-724654"},
+        {"role": "assistant", "content": "For more details, please call zero one zero, seven two four six five four"},
+        {"role": "user", "content": "Lawson announced it will delist on July 24, with over 6000 stores in China!"},
         {
             "role": "assistant",
-            "content": "罗森宣布将于七月二十四日退市，在华门店超过六千家。",
+            "content": "Lawson announced it will delist on July twenty-fourth, with over six thousand stores in China.",
         },
     ],
 }
