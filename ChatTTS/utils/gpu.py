@@ -1,40 +1,36 @@
 import torch
-
 from .log import logger
 
 
 def select_device(min_memory=2047, experimental=False):
+    logger_instance = logger.get_logger()
+
     if torch.cuda.is_available():
-        selected_gpu = 0
+        selected_gpu = None
         max_free_memory = -1
+
         for i in range(torch.cuda.device_count()):
-            props = torch.cuda.get_device_properties(i)
-            free_memory = props.total_memory - torch.cuda.memory_reserved(i)
-            if max_free_memory < free_memory:
-                selected_gpu = i
+            free_memory = torch.cuda.mem_get_info(i)[0]
+            if free_memory > max_free_memory:
                 max_free_memory = free_memory
+                selected_gpu = i
+
         free_memory_mb = max_free_memory / (1024 * 1024)
         if free_memory_mb < min_memory:
-            logger.get_logger().warning(
+            logger_instance.warning(
                 f"GPU {selected_gpu} has {round(free_memory_mb, 2)} MB memory left. Switching to CPU."
             )
-            device = torch.device("cpu")
+            return torch.device("cpu")
         else:
-            device = torch.device(f"cuda:{selected_gpu}")
-    elif torch.backends.mps.is_available():
-        """
-        Currently MPS is slower than CPU while needs more memory and core utility,
-        so only enable this for experimental use.
-        """
-        if experimental:
-            # For Apple M1/M2 chips with Metal Performance Shaders
-            logger.get_logger().warn("experimantal: found apple GPU, using MPS.")
-            device = torch.device("mps")
-        else:
-            logger.get_logger().info("found Apple GPU, but use CPU.")
-            device = torch.device("cpu")
-    else:
-        logger.get_logger().warning("no GPU found, use CPU instead")
-        device = torch.device("cpu")
+            return torch.device(f"cuda:{selected_gpu}")
 
-    return device
+    if torch.backends.mps.is_available():
+        if experimental:
+            logger_instance.warn("experimental: found Apple GPU, using MPS.")
+            return torch.device("mps")
+        else:
+            logger_instance.info("found Apple GPU, but using CPU.")
+            return torch.device("cpu")
+
+    logger_instance.warning("no GPU found, using CPU instead")
+    return torch.device("cpu")
