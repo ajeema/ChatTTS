@@ -45,24 +45,16 @@ class Chat:
 
         self.context = GPT.Context()
 
-    def has_loaded(self, use_decoder=False):
-        not_finish = False
-        check_list = ["vocos", "gpt", "tokenizer"]
-
-        if use_decoder:
-            check_list.append("decoder")
-        else:
-            check_list.append("dvae")
+    def has_loaded(self, use_decoder=False) -> bool:
+        check_list = ["vocos", "gpt", "tokenizer", "decoder" if use_decoder else "dvae"]
 
         for module in check_list:
             if not hasattr(self, module) and module not in self.pretrain_models:
                 self.logger.warning(f"{module} not initialized.")
-                not_finish = True
+                return False
 
-        if not not_finish:
-            self.logger.info("all models has been initialized.")
-
-        return not not_finish
+        self.logger.info("All models have been initialized.")
+        return True
 
     def download_models(
         self,
@@ -78,12 +70,8 @@ class Chat:
             ):
                 with tempfile.TemporaryDirectory() as tmp:
                     download_all_assets(tmpdir=tmp)
-                if not check_all_assets(
-                    Path(download_path), self.sha256_map, update=False
-                ):
-                    self.logger.error(
-                        "download to local path %s failed.", download_path
-                    )
+                if not check_all_assets(Path(download_path), self.sha256_map, update=False):
+                    self.logger.error("Download to local path %s failed.", download_path)
                     return None
         elif source == "huggingface":
             hf_home = os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
@@ -91,30 +79,24 @@ class Chat:
                 download_path = get_latest_modified_file(
                     os.path.join(hf_home, "hub/models--2Noise--ChatTTS/snapshots")
                 )
-            except:
+            except Exception as e:
+                self.logger.error("Error getting latest modified file: %s", str(e))
                 download_path = None
             if download_path is None or force_redownload:
-                self.logger.log(
-                    logging.INFO,
-                    f"download from HF: https://huggingface.co/2Noise/ChatTTS",
-                )
+                self.logger.info("Downloading from HF: https://huggingface.co/2Noise/ChatTTS")
                 try:
                     download_path = snapshot_download(
                         repo_id="2Noise/ChatTTS", allow_patterns=["*.pt", "*.yaml"]
                     )
-                except:
+                except Exception as e:
+                    self.logger.error("Error downloading from huggingface: %s", str(e))
                     download_path = None
             else:
-                self.logger.log(
-                    logging.INFO, f"load latest snapshot from cache: {download_path}"
-                )
-            if download_path is None:
-                self.logger.error("download from huggingface failed.")
-                return None
+                self.logger.info("Loaded latest snapshot from cache: %s", download_path)
         elif source == "custom":
-            self.logger.log(logging.INFO, f"try to load from local: {custom_path}")
+            self.logger.info("Trying to load from local: %s", custom_path)
             if not check_all_assets(Path(custom_path), self.sha256_map, update=False):
-                self.logger.error("check models in custom path %s failed.", custom_path)
+                self.logger.error("Check models in custom path %s failed.", custom_path)
                 return None
             download_path = custom_path
 
@@ -169,9 +151,7 @@ class Chat:
                 lzma.compress(
                     arr.tobytes(),
                     format=lzma.FORMAT_RAW,
-                    filters=[
-                        {"id": lzma.FILTER_LZMA2, "preset": 9 | lzma.PRESET_EXTREME}
-                    ],
+                    filters=[{"id": lzma.FILTER_LZMA2, "preset": 9 | lzma.PRESET_EXTREME}],
                 ),
             )
             del arr
@@ -262,86 +242,80 @@ class Chat:
     ):
         if device is None:
             device = select_device()
-            self.logger.info("use device %s", str(device))
+            self.logger.info("Using device: %s", str(device))
         self.device = device
 
         if vocos_config_path:
-            vocos = (
-                Vocos.from_hparams(vocos_config_path)
-                .to(
-                    # vocos on mps will crash, use cpu fallback
-                    "cpu"
-                    if "mps" in str(device)
-                    else device
-                )
-                .eval()
-            )
-            assert vocos_ckpt_path, "vocos_ckpt_path should not be None"
-            vocos.load_state_dict(
-                torch.load(vocos_ckpt_path, weights_only=True, mmap=True)
-            )
-            self.vocos = vocos
-            self.logger.log(logging.INFO, "vocos loaded.")
+            self.vocos = self._load_vocos(vocos_config_path, vocos_ckpt_path)
 
         if dvae_config_path:
-            cfg = OmegaConf.load(dvae_config_path)
-            dvae = DVAE(**cfg, coef=coef).to(device).eval()
-            coef = str(dvae)
-            assert dvae_ckpt_path, "dvae_ckpt_path should not be None"
-            dvae.load_state_dict(
-                torch.load(dvae_ckpt_path, weights_only=True, mmap=True)
-            )
-            self.dvae = dvae
-            self.logger.log(logging.INFO, "dvae loaded.")
+            self.dvae = self._load_dvae(dvae_config_path, dvae_ckpt_path, coef)
 
         if gpt_config_path:
-            cfg = OmegaConf.load(gpt_config_path)
-            gpt = GPT(
-                **cfg, use_flash_attn=use_flash_attn, device=device, logger=self.logger
-            ).eval()
-            assert gpt_ckpt_path, "gpt_ckpt_path should not be None"
-            gpt.load_state_dict(torch.load(gpt_ckpt_path, weights_only=True, mmap=True))
-            gpt.prepare(compile=compile and "cuda" in str(device))
-            self.gpt = gpt
-            spk_stat_path = os.path.join(os.path.dirname(gpt_ckpt_path), "spk_stat.pt")
-            assert os.path.exists(
-                spk_stat_path
-            ), f"Missing spk_stat.pt: {spk_stat_path}"
-            self.pretrain_models["spk_stat"] = torch.load(
-                spk_stat_path, weights_only=True, mmap=True
-            ).to(device)
-            self.logger.log(logging.INFO, "gpt loaded.")
+            self.gpt = self._load_gpt(gpt_config_path, gpt_ckpt_path, use_flash_attn, compile)
+            self._load_speaker_stats(gpt_ckpt_path)
 
         if decoder_config_path:
-            cfg = OmegaConf.load(decoder_config_path)
-            decoder = DVAE(**cfg, coef=coef).to(device).eval()
-            coef = str(decoder)
-            assert decoder_ckpt_path, "decoder_ckpt_path should not be None"
-            decoder.load_state_dict(
-                torch.load(decoder_ckpt_path, weights_only=True, mmap=True)
-            )
-            self.decoder = decoder
-            self.logger.log(logging.INFO, "decoder loaded.")
+            self.decoder = self._load_decoder(decoder_config_path, decoder_ckpt_path, coef)
 
         if tokenizer_path:
-            tokenizer = torch.load(tokenizer_path, map_location=device, mmap=True)
-            tokenizer.padding_side = "left"
-            self.pretrain_models["tokenizer"] = tokenizer
-            self.tokenizer_len = len(tokenizer)
-            self.tokenizer_spk_emb_ids: torch.Tensor = tokenizer.convert_tokens_to_ids(
-                "[spk_emb]"
-            )
-            self.tokenizer_break_0_ids: torch.Tensor = tokenizer.convert_tokens_to_ids(
-                "[break_0]"
-            )
-            self.tokenizer_eos_token: torch.Tensor = torch.tensor(
-                tokenizer.convert_tokens_to_ids("[Ebreak]"), device=gpt.device_gpt
-            ).unsqueeze_(0)
-            self.logger.log(logging.INFO, "tokenizer loaded.")
+            self._load_tokenizer(tokenizer_path)
 
         self.coef = coef
 
         return self.has_loaded()
+
+    def _load_vocos(self, config_path, ckpt_path):
+        vocos = Vocos.from_hparams(config_path).to(
+            "cpu" if "mps" in str(self.device) else self.device
+        ).eval()
+        assert ckpt_path, "vocos_ckpt_path should not be None"
+        vocos.load_state_dict(torch.load(ckpt_path, weights_only=True, mmap=True))
+        self.logger.info("Vocos loaded.")
+        return vocos
+
+    def _load_dvae(self, config_path, ckpt_path, coef):
+        cfg = OmegaConf.load(config_path)
+        dvae = DVAE(**cfg, coef=coef).to(self.device).eval()
+        assert ckpt_path, "dvae_ckpt_path should not be None"
+        dvae.load_state_dict(torch.load(ckpt_path, weights_only=True, mmap=True))
+        self.logger.info("DVAE loaded.")
+        return dvae
+
+    def _load_gpt(self, config_path, ckpt_path, use_flash_attn, compile):
+        cfg = OmegaConf.load(config_path)
+        gpt = GPT(**cfg, use_flash_attn=use_flash_attn, device=self.device, logger=self.logger).eval()
+        assert ckpt_path, "gpt_ckpt_path should not be None"
+        gpt.load_state_dict(torch.load(ckpt_path, weights_only=True, mmap=True))
+        gpt.prepare(compile=compile and "cuda" in str(self.device))
+        self.logger.info("GPT loaded.")
+        return gpt
+
+    def _load_speaker_stats(self, gpt_ckpt_path):
+        spk_stat_path = os.path.join(os.path.dirname(gpt_ckpt_path), "spk_stat.pt")
+        assert os.path.exists(spk_stat_path), f"Missing spk_stat.pt: {spk_stat_path}"
+        self.pretrain_models["spk_stat"] = torch.load(spk_stat_path, weights_only=True, mmap=True).to(self.device)
+        self.logger.info("Speaker stats loaded.")
+
+    def _load_decoder(self, config_path, ckpt_path, coef):
+        cfg = OmegaConf.load(config_path)
+        decoder = DVAE(**cfg, coef=coef).to(self.device).eval()
+        assert ckpt_path, "decoder_ckpt_path should not be None"
+        decoder.load_state_dict(torch.load(ckpt_path, weights_only=True, mmap=True))
+        self.logger.info("Decoder loaded.")
+        return decoder
+
+    def _load_tokenizer(self, tokenizer_path):
+        tokenizer = torch.load(tokenizer_path, map_location=self.device, mmap=True)
+        tokenizer.padding_side = "left"
+        self.pretrain_models["tokenizer"] = tokenizer
+        self.tokenizer_len = len(tokenizer)
+        self.tokenizer_spk_emb_ids = tokenizer.convert_tokens_to_ids("[spk_emb]")
+        self.tokenizer_break_0_ids = tokenizer.convert_tokens_to_ids("[break_0]")
+        self.tokenizer_eos_token = torch.tensor(
+            tokenizer.convert_tokens_to_ids("[Ebreak]"), device=self.gpt.device_gpt
+        ).unsqueeze_(0)
+        self.logger.info("Tokenizer loaded.")
 
     def _infer(
         self,
@@ -373,7 +347,6 @@ class Chat:
         ]
 
         with torch.no_grad():
-
             if not skip_refine_text:
                 refined = self._refine_text(
                     text,
