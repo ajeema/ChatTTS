@@ -138,16 +138,9 @@ class GPT(nn.Module):
         position_ids: Optional[torch.Tensor] = None,
         use_cache=True,
     ) -> _GenerationInputs:
-        has_static_cache = past_key_values is None and hasattr(self.gpt.layers[0].self_attn, "past_key_value")
-
         past_length = 0
         if past_key_values is not None:
-            if isinstance(past_key_values, Cache):
-                past_length = int(cache_position[0]) if cache_position is not None else past_key_values.get_seq_length()
-                max_cache_length = past_key_values.get_max_length()
-                cache_length = min(max_cache_length, past_length) if max_cache_length is not None else past_length
-            else:
-                cache_length = past_length = past_key_values[0][0].shape[2]
+            past_length = past_key_values[0][0].shape[2]
 
             if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
                 start = -(attention_mask.shape[1] - past_length)
@@ -155,8 +148,11 @@ class GPT(nn.Module):
             elif past_length < input_ids.shape[1]:
                 input_ids = input_ids.narrow(1, past_length, input_ids.size(1) - past_length)
 
-            if max_cache_length is not None and attention_mask is not None and cache_length + input_ids.shape[1] > max_cache_length:
-                attention_mask = attention_mask.narrow(1, -max_cache_length, max_cache_length)
+            if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
+                start = -(attention_mask.shape[1] - past_length)
+                input_ids = input_ids.narrow(1, start, -start)
+            elif past_length < input_ids.shape[1]:
+                input_ids = input_ids.narrow(1, past_length, input_ids.size(1) - past_length)
 
         if attention_mask is not None and position_ids is None:
             position_ids = attention_mask.long().cumsum(-1) - 1
@@ -166,9 +162,6 @@ class GPT(nn.Module):
 
         input_length = position_ids.shape[-1] if position_ids is not None else input_ids.shape[-1]
         cache_position = cache_position.narrow(0, -input_length, input_length) if cache_position is not None else torch.arange(past_length, past_length + input_length, device=input_ids.device)
-
-        if has_static_cache:
-            past_key_values = None
 
         model_inputs = self._GenerationInputs(
             position_ids=position_ids,
